@@ -1,0 +1,266 @@
+/* =============================================================
+   styles.css — ClearBank
+   Change the colours here and the whole app updates.
+   ============================================================= */
+:root {
+  --primary: #1F4E5F;   /* dark teal, trust */
+  --bg: #F6F8F9;
+  --card: #FFFFFF;
+  --text: #1B1F23;
+  --muted: #5F6B73;
+  --success: #2E8B57;
+  --warning: #D98E04;
+  --danger: #C0392B;
+
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --tap: 44px;          /* minimum tap-target size */
+}
+
+/* ----- Basics ----- */
+* { box-sizing: border-box; }
+
+/* Anything with the `hidden` attribute stays hidden, even if a class below
+   gives it display: flex or block. Without this, hidden overlays would show. */
+[hidden] { display: none !important; }
+
+html { font-size: 16px; }
+
+/* Large text setting: add class="large-text" to <body> from JS.
+   Everything sized in rem grows by ~15%. Use rem, not px, for font sizes! */
+html:has(body.large-text) { font-size: 18.4px; }
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: #E3E7EA;   /* light grey around the phone on desktop */
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+/* Clear keyboard focus ring on everything focusable */
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ----- Phone frame -----
+   On a phone this fills the screen; on desktop it's centred with rounded corners. */
+.phone {
+  position: relative;       /* overlays and toast position themselves inside this */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 390px;
+  height: 100vh;
+  margin: 0 auto;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+@media (min-width: 500px) {
+  body { padding: 24px 0; }
+  .phone {
+    height: 844px;
+    max-height: calc(100vh - 48px);
+    border-radius: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  }
+}
+
+/* ----- Header ----- */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+}
+.app-title { margin: 0; font-size: 1.375rem; font-weight: 700; color: var(--primary); }
+.header-actions { display: flex; gap: 4px; }
+
+.icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+}
+.icon-btn:hover { background: rgba(31, 78, 95, 0.08); }
+
+.icon {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Red dot on the bell. Hide it from JS with the `hidden` attribute. */
+.bell-dot {
+  position: absolute;
+  top: 10px;
+  right: 11px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 2px solid var(--bg);
+}
+
+/* ----- Screens ----- */
+.screens {
+  flex: 1;
+  overflow-y: auto;          /* each screen scrolls, header and nav stay put */
+}
+.screen { padding: 8px 16px 24px; }
+
+/* ----- Bottom nav ----- */
+.bottom-nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid #E1E6E9;
+  background: var(--card);
+}
+.nav-btn {
+  min-height: 56px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.nav-btn.active { color: var(--primary); font-weight: 700; }
+
+/* ----- Reusable building blocks (use these in your screens) ----- */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 16px;
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.muted { color: var(--muted); }
+
+/* ----- Popups ----- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(27, 31, 35, 0.5);   /* dimmed background */
+  z-index: 10;
+}
+.popup {
+  width: 100%;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+.popup-warning { border-top: 6px solid var(--warning); }
+
+/* ----- Toast ----- */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 76px;              /* just above the bottom nav */
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #fff;
+  font-size: 0.9375rem;
+  z-index: 20;
+}
+
+/* ----- Forms ----- */
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-weight: 600; margin-bottom: 4px; }
+.form-group select,
+.form-group input[type="text"],
+.form-group input[type="number"] {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 12px;
+  border: 1px solid #D7DDE1;
+  border-radius: var(--radius);
+  background: var(--card);
+  margin-bottom: 8px;
+}
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: 500; margin: 12px 0; }
+.error-text { color: var(--danger); font-size: 0.875rem; margin: -4px 0 8px; }
+.tick { font-size: 2.5rem; color: var(--success); text-align: center; margin: 8px 0; }
+
+/* ----- Inline payee check result ----- */
+.check-result { padding: 12px; border-radius: var(--radius); margin-top: 8px; }
+.check-result-match { background: rgba(46, 139, 87, 0.1); border: 1px solid var(--success); }
+.check-result-warning { background: rgba(217, 142, 4, 0.1); border: 1px solid var(--warning); }
+.check-result p { margin: 0 0 8px; }
+.check-result p:last-child { margin-bottom: 0; }
+
+/* ----- Transaction / subscription rows ----- */
+.tx-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #EEF1F2;
+  font-size: 0.9375rem;
+}
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #EEF1F2;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.tag-warning { background: rgba(217, 142, 4, 0.15); color: var(--warning); }
+
+.sub-row { cursor: pointer; }
+.sub-row-header { display: flex; align-items: center; gap: 10px; }
+.sub-logo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.sub-row-header span:nth-child(2) { flex: 1; font-weight: 600; }
+.sub-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid #EEF1F2; }
+.sub-detail p { margin: 4px 0; color: var(--muted); font-size: 0.9375rem; }
+
+/* TODO: styles for your screens go below here */

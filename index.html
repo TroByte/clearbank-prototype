@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClearBank</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- The phone-shaped frame. On a real phone it just fills the screen. -->
+  <div class="phone">
+
+    <!-- ===== Header (shared by every screen) ===== -->
+    <header class="app-header">
+      <h1 class="app-title">ClearBank</h1>
+      <div class="header-actions">
+        <button class="icon-btn" id="bell-btn" aria-label="Notifications">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="bell-dot" id="bell-dot"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== Screens =====
+         Each screen is a <section class="screen">. Only one is visible at a time.
+         showScreen() in app.js removes `hidden` from one screen and adds it to all the others. -->
+    <main class="screens">
+
+      <!-- 1. Dashboard -->
+      <section class="screen" id="screen-dashboard">
+        <div class="card" id="balances-card">
+          <!-- balances will go here -->
+        </div>
+        <div class="card" id="spending-card">
+          <h2>Spending by category</h2>
+          <div id="spending-chart"></div>
+        </div>
+        <div class="card" id="transactions-card">
+          <h2>Recent transactions</h2>
+          <div id="transactions-list"></div>
+          <button class="btn" id="see-all-btn">See all</button>
+        </div>
+      </section>
+
+      <!-- 3. Transfer: From/To/amount, "Add new payee" reveals a small inline form
+           (Name + Account number + Check), and the check result — match, or the
+           amber "registered to someone else" scam warning — appears inline. -->
+      <section class="screen" id="screen-transfer" hidden>
+        <div class="card">
+          <div class="form-group">
+            <label for="from-account">From</label>
+            <select id="from-account"></select>
+          </div>
+
+          <div class="form-group">
+            <label for="to-payee">To</label>
+            <select id="to-payee"></select>
+            <button class="btn" id="add-payee-btn" type="button">Add new payee</button>
+          </div>
+
+          <div class="form-group" id="new-payee-form" hidden>
+            <label for="new-payee-name">Name</label>
+            <input type="text" id="new-payee-name">
+            <label for="new-payee-account">Account number</label>
+            <input type="text" id="new-payee-account" inputmode="numeric" placeholder="12-3456-7890123-00">
+            <button class="btn" id="check-payee-btn" type="button">Check</button>
+            <div class="check-result" id="check-result" hidden></div>
+          </div>
+
+          <div class="form-group">
+            <label for="transfer-amount">Amount</label>
+            <input type="number" id="transfer-amount" min="0" step="0.01">
+            <p class="error-text" id="amount-error" hidden></p>
+          </div>
+
+          <button class="btn btn-primary" id="transfer-continue-btn" type="button">Continue</button>
+        </div>
+      </section>
+
+      <!-- 4. Confirm and Completed: one screen, three states toggled from JS -->
+      <section class="screen" id="screen-confirm" hidden>
+        <div class="card" id="confirm-readback">
+          <p id="confirm-text"></p>
+          <p id="confirm-balance-after" class="muted"></p>
+          <button class="btn btn-primary" id="confirm-pay-btn" type="button">Confirm and pay</button>
+          <button class="btn" id="confirm-edit-btn" type="button">Edit</button>
+        </div>
+        <div class="card" id="confirm-processing" hidden>
+          <p>Processing…</p>
+        </div>
+        <div class="card" id="confirm-completed" hidden>
+          <p class="tick">✓</p>
+          <p id="completed-text"></p>
+          <button class="btn btn-primary" id="completed-ok-btn" type="button">OK</button>
+        </div>
+      </section>
+
+      <!-- 5. Subscriptions: summary card + list; tapping a row expands it in place -->
+      <section class="screen" id="screen-subscriptions" hidden>
+        <div class="card">
+          <p id="sub-summary"></p>
+        </div>
+        <div id="sub-list"></div>
+      </section>
+
+      <!-- 6. History -->
+      <section class="screen" id="screen-history" hidden>
+        <div class="card">
+          <label for="history-search">Search</label>
+          <input type="text" id="history-search" placeholder="Search by merchant">
+          <label for="history-category-filter">Category</label>
+          <select id="history-category-filter"></select>
+        </div>
+        <div id="history-list"></div>
+        <p class="muted" id="history-hint">Tick at least one transaction</p>
+        <button class="btn" id="assign-category-btn" type="button" disabled>Assign category</button>
+        <button class="btn" id="export-btn" type="button" disabled>Export</button>
+      </section>
+
+    </main>
+
+    <!-- ===== Bottom navigation ===== -->
+    <nav class="bottom-nav" aria-label="Main">
+      <button class="nav-btn active" data-screen="screen-dashboard">Home</button>
+      <button class="nav-btn" data-screen="screen-transfer">Transfer</button>
+      <button class="nav-btn" data-screen="screen-subscriptions">Subscriptions</button>
+      <button class="nav-btn" data-screen="screen-history">History</button>
+    </nav>
+
+    <!-- ===== Popups (overlays) =====
+         Only the notification and the two History popups are overlays — the
+         scam warning lives inline on the Transfer screen instead. -->
+
+    <!-- 2. Notification popup -->
+    <div class="overlay" id="popup-notification" hidden>
+      <div class="popup" role="dialog" aria-modal="true">
+        <h2>Spotify price increase</h2>
+        <p>Your Spotify subscription went up from $16.99 to $18.99 a month.</p>
+        <p class="muted">You're seeing this because a recurring price changed.</p>
+        <button class="btn btn-primary" id="notification-ok-btn">OK</button>
+        <button class="btn" id="notification-view-sub-btn">View subscription</button>
+      </div>
+    </div>
+
+    <!-- 7a. Assign category (History popup) -->
+    <div class="overlay" id="popup-assign" hidden>
+      <div class="popup" role="dialog" aria-modal="true">
+        <h2>Assign category</h2>
+        <label for="assign-category-select">Category</label>
+        <select id="assign-category-select"></select>
+        <label for="assign-new-category">Or create a new category</label>
+        <input type="text" id="assign-new-category" placeholder="New category name">
+        <label class="checkbox-label">
+          <input type="checkbox" id="assign-auto-apply">
+          Also apply to all transactions from this merchant
+        </label>
+        <button class="btn" id="assign-cancel-btn" type="button">Cancel</button>
+        <button class="btn btn-primary" id="assign-save-btn" type="button">Save</button>
+      </div>
+    </div>
+
+    <!-- 7b. Export completed (History popup) -->
+    <div class="overlay" id="popup-export" hidden>
+      <div class="popup" role="dialog" aria-modal="true">
+        <p class="tick">✓</p>
+        <p>Export completed</p>
+        <p id="export-text"></p>
+        <button class="btn btn-primary" id="export-ok-btn" type="button">OK</button>
+      </div>
+    </div>
+
+    <!-- Toast: small message that appears for ~2 seconds -->
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  </div>
+
+  <!-- Order matters: data first, then the code that uses it. -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
