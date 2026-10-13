@@ -14,13 +14,6 @@ let state = createStartData();
 let currentScreen = "screen-dashboard";
 let history = [];
 
-/**
- * timer for popup screens
- */
-setTimeout(function() {
-  openPopup("popup-notification");
-}, 1000);
-
 
 // ----- Helpers (ready to use) -----
 
@@ -32,6 +25,33 @@ function formatMoney(amount) {
 // formatDate(someDate) -> "21 Sep"
 function formatDate(date) {
   return date.toLocaleDateString("en-NZ", { day: "numeric", month: "short" });
+}
+
+// formatFullDate(someDate) -> "21 Sep 2026" (used in the CSV export, where the year matters)
+function formatFullDate(date) {
+  return date.toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// Subscriptions that are still being paid (not stopped by the user).
+function getActiveSubscriptions() {
+  return state.subscriptions.filter(function(sub) {
+    return !sub.stopped;
+  });
+}
+
+// Total monthly cost of the active subscriptions. Used by the Subscriptions
+// screen AND the dashboard chart, so the two always agree.
+function getMonthlySubscriptionTotal() {
+  return getActiveSubscriptions().reduce(function(sum, sub) {
+    return sum + sub.price;
+  }, 0);
+}
+
+// Active subscriptions whose price went up (they have a previousPrice).
+function getPriceChanges() {
+  return getActiveSubscriptions().filter(function(sub) {
+    return sub.previousPrice;
+  });
 }
 
 
@@ -124,12 +144,18 @@ renderDashboard();
  * The spending chart is based on the spendingThisMonth array in the state.
  */
 function renderSpendingChart() {
-  let amounts = state.spendingThisMonth.map(function (item) {
+  // Subscriptions isn't stored in spendingThisMonth: it's worked out from the
+  // active subscriptions so the chart matches the Subscriptions screen.
+  let items = state.spendingThisMonth.concat([
+    { category: "Subscriptions", amount: getMonthlySubscriptionTotal() },
+  ]);
+
+  let amounts = items.map(function (item) {
     return item.amount;              // (1) what value from each item do we want?
   });
   let maxAmount = Math.max(...amounts);   // (2) how do we "unpack" the amounts array here?
 
-  let html = state.spendingThisMonth.map(function (item) {
+  let html = items.map(function (item) {
     let percent = ( item.amount / maxAmount ) * 100;   // (3) which two values divide to get the percent? 
     return `<div class="bar-row">
       <span>${item.category}</span>                 
@@ -148,7 +174,8 @@ renderSpendingChart();
  * @returns 5 most recent transactions
  */
 function renderRecentTransactions() {
-  let sorted = state.transactions.sort(function (a, b) {
+  // .slice() first so sorting doesn't reorder state.transactions itself
+  let sorted = state.transactions.slice().sort(function (a, b) {
     return b.date - a.date;         // (1) which field, in which order, for "newest first"?
   });
   let recent = sorted.slice(0, 5);  // (2) which method keeps just the first 5?
@@ -197,20 +224,63 @@ function closePopup(id) {
   document.getElementById(id).hidden = true;
 }
 
+/**
+ * Fills in the notification popup from the data: one line per subscription
+ * whose price went up. With no price changes it says "You're all caught up".
+ * Also shows the bell's red dot only while there is something unread.
+ */
+function renderNotification() {
+  let changes = getPriceChanges();
+  let title = document.getElementById("notification-title");
+  let body = document.getElementById("notification-body");
+
+  if (changes.length === 0) {
+    title.textContent = "No new notifications";
+    body.innerHTML = `<p>You're all caught up.</p>`;
+  } else {
+    title.textContent = changes.length === 1
+      ? `${changes[0].name} price increase`
+      : `${changes.length} subscription prices went up`;
+    body.innerHTML = changes.map(function(sub) {
+      return `<p>Your ${sub.name} subscription went up from ${formatMoney(sub.previousPrice)} to ${formatMoney(sub.price)} a month.</p>`;
+    }).join("");
+  }
+
+  // the reason line and "View subscription" only make sense when there's a change
+  document.getElementById("notification-reason").hidden = changes.length === 0;
+  document.getElementById("notification-view-sub-btn").hidden = changes.length === 0;
+  document.getElementById("bell-dot").hidden = !(state.notificationUnread && changes.length > 0);
+}
+renderNotification();
+
+function markNotificationRead() {
+  state.notificationUnread = false;
+  renderNotification();
+}
+
 // add event listeners to the notification popup buttons
 let okBtn = document.getElementById("notification-ok-btn");
 okBtn.addEventListener("click", function() {
   closePopup("popup-notification");
-  document.getElementById("bell-dot").hidden = true;
+  markNotificationRead();
 });
 
-// add event listener to the "View subscription" button in the notification popup
+// "View subscription" goes to Subscriptions with the changed one already expanded
 let viewSubBtn = document.getElementById("notification-view-sub-btn");
 viewSubBtn.addEventListener("click", function() {
   closePopup("popup-notification");
+  let changes = getPriceChanges();
+  renderSubscriptions(changes.length > 0 ? changes[0].id : null);
   showScreen("screen-subscriptions");
-  document.getElementById("bell-dot").hidden = true;
+  markNotificationRead();
 });
+
+// About 1 second after the page loads, show the notification if there's an unread price change
+setTimeout(function() {
+  if (state.notificationUnread && getPriceChanges().length > 0) {
+    openPopup("popup-notification");
+  }
+}, 1000);
 
 /**
  * pop up toast message for 2 seconds
@@ -295,6 +365,15 @@ continueBtn.addEventListener("click", function() {
 
   errorText.hidden = true;
 
+  // repeat the name check on the read-back, so it's still visible right before paying
+  let verifiedText = document.getElementById("confirm-verified");
+  if (selectedPayee.verified) {
+    verifiedText.textContent = `✓ Name confirmed: account belongs to ${selectedPayee.name}`;
+    verifiedText.hidden = false;
+  } else {
+    verifiedText.hidden = true;
+  }
+
   pendingTransfer = {
     accountId: selectedAccount.id,
     payeeId: selectedPayee.id,
@@ -320,6 +399,12 @@ continueBtn.addEventListener("click", function() {
 let addPayeeBtn = document.getElementById("add-payee-btn");
 addPayeeBtn.addEventListener("click", function() {
   document.getElementById("new-payee-form").hidden = false;
+  document.getElementById("check-result").hidden = true; // clear any old result
+});
+
+// the match message is about the payee just added, so hide it if a different one is picked
+document.getElementById("to-payee").addEventListener("change", function() {
+  document.getElementById("check-result").hidden = true;
 });
 
 /**
@@ -364,14 +449,18 @@ checkPayeeBtn.addEventListener("click", function() {
 
   if (isMatch) {
     checkResult.className = "check-result check-result-match";
-    checkResult.innerHTML = `<p>Name matches: ${registeredName} ✓</p>`;
-    checkResult.hidden = false;
+    checkResult.innerHTML = `
+      <p><strong>Name matches: ${registeredName} ✓</strong></p>
+      <p>${registeredName} has been added and selected as your payee.</p>
+    `;
+    checkResult.hidden = false; // stays visible: it's outside the form that hides below
 
     let newPayee = {
       id: "payee-" + Date.now(),
       nickname: name,
       name: registeredName,
       account: account,
+      verified: true,
     };
     state.payees.push(newPayee);
     renderPayeeOptions();
@@ -418,12 +507,13 @@ document.getElementById("confirm-pay-btn").addEventListener("click", function() 
       return p.id === pendingTransfer.payeeId;
     });
 
-    account.balance -= pendingTransfer.amount;
+    let amount = pendingTransfer.amount;
+    account.balance -= amount;
 
     state.transactions.push({
       id: "t" + Date.now(),
       merchant: payee.nickname,
-      amount: pendingTransfer.amount,
+      amount: amount,
       category: "Uncategorised",
       date: new Date(),
     });
@@ -434,8 +524,9 @@ document.getElementById("confirm-pay-btn").addEventListener("click", function() 
     renderRecentTransactions();
     renderAccountOptions();
 
+    // state exactly what happened (the Phase I Westpac problem was a vague status)
     document.getElementById("completed-text").textContent =
-      `Payment sent. ${payee.nickname} should receive it within a few minutes.`;
+      `Completed. Instant transfer: ${payee.nickname} has received ${formatMoney(amount)}.`;
 
     document.getElementById("confirm-processing").hidden = true;
     document.getElementById("confirm-completed").hidden = false;
@@ -446,6 +537,7 @@ document.getElementById("confirm-pay-btn").addEventListener("click", function() 
 
 document.getElementById("completed-ok-btn").addEventListener("click", function() {
   document.getElementById("transfer-amount").value = "";
+  document.getElementById("check-result").hidden = true;
   showScreen("screen-dashboard");
 });
 
@@ -453,40 +545,55 @@ document.getElementById("completed-ok-btn").addEventListener("click", function()
 
 /**
  * Renders the subscriptions summary card and the list of subscriptions.
- * Spotify is always shown first (it's the one with a price change to show off).
+ * Order: price went up first, then the rest, then stopped ones (greyed out).
  * Tapping a row toggles its detail section open/closed.
+ * @param {*} expandId optional id of a subscription to show already expanded
  */
-function renderSubscriptions() {
-  let monthlyTotal = state.subscriptions.reduce(function(sum, sub) {
-    return sum + sub.price;
-  }, 0);
+function renderSubscriptions(expandId) {
+  let monthlyTotal = getMonthlySubscriptionTotal(); // stopped subscriptions don't count
   let yearlyTotal = monthlyTotal * 12;
 
   document.getElementById("sub-summary").textContent =
     `${formatMoney(monthlyTotal)} / month · ${formatMoney(yearlyTotal)} / year`;
 
+  // lower rank = higher in the list. .sort() keeps the data.js order within a rank.
+  function rank(sub) {
+    if (sub.stopped) return 2;
+    if (sub.previousPrice) return 0;
+    return 1;
+  }
   let sorted = state.subscriptions.slice().sort(function(a, b) {
-    if (a.id === "spotify") return -1;
-    if (b.id === "spotify") return 1;
-    return 0;
+    return rank(a) - rank(b);
   });
 
   let html = sorted.map(function(sub) {
-    let priceUpTag = sub.previousPrice ? `<span class="tag tag-warning">Price up</span>` : "";
-
-    let detail = `<p>Next charge: ${formatDate(sub.nextCharge)}</p><p>Yearly cost: ${formatMoney(sub.price * 12)}</p>`;
-    if (sub.previousPrice) {
-      detail = `<p>Previous price: ${formatMoney(sub.previousPrice)} (changed ${formatDate(sub.priceChangedOn)})</p>` + detail;
+    let tag = "";
+    if (sub.stopped) {
+      tag = `<span class="tag">Stopped</span>`;
+    } else if (sub.previousPrice) {
+      tag = `<span class="tag tag-warning">Price up</span>`;
     }
 
-    return `<div class="card sub-row" data-sub-id="${sub.id}">
+    let detail;
+    if (sub.stopped) {
+      detail = `<p>Payments from ClearBank to ${sub.name} are stopped. To close your account completely, also cancel with ${sub.name}.</p>`;
+    } else {
+      detail = `<p>Next charge: ${formatDate(sub.nextCharge)}</p><p>Yearly cost: ${formatMoney(sub.price * 12)}</p>`;
+      if (sub.previousPrice) {
+        detail = `<p>Previous price: ${formatMoney(sub.previousPrice)} (changed ${formatDate(sub.priceChangedOn)})</p>` + detail;
+      }
+      detail += `<button class="btn stop-sub-btn" type="button" data-sub-id="${sub.id}">Stop this subscription</button>`;
+    }
+
+    let isExpanded = sub.id === expandId;
+    return `<div class="card sub-row${sub.stopped ? " sub-row-stopped" : ""}" data-sub-id="${sub.id}">
       <div class="sub-row-header">
         <span class="sub-logo">${sub.name.charAt(0)}</span>
         <span>${sub.name}</span>
-        ${priceUpTag}
+        ${tag}
         <span>${formatMoney(sub.price)}</span>
       </div>
-      <div class="sub-detail" hidden>${detail}</div>
+      <div class="sub-detail"${isExpanded ? "" : " hidden"}>${detail}</div>
     </div>`;
   }).join("");
 
@@ -498,8 +605,49 @@ function renderSubscriptions() {
       detailDiv.hidden = !detailDiv.hidden;
     });
   }
+
+  for (let stopBtn of document.querySelectorAll(".stop-sub-btn")) {
+    stopBtn.addEventListener("click", function(event) {
+      event.stopPropagation(); // don't also collapse the row this button sits in
+      openStopSubscription(stopBtn.dataset.subId);
+    });
+  }
 }
 renderSubscriptions();
+
+// id of the subscription the "Stop this subscription?" popup is asking about
+let pendingStopSubId = null;
+
+function openStopSubscription(subId) {
+  let sub = state.subscriptions.find(function(s) {
+    return s.id === subId;
+  });
+  pendingStopSubId = subId;
+  document.getElementById("stop-sub-text").textContent =
+    `ClearBank will stop paying ${sub.name} (${formatMoney(sub.price)} a month). You may also need to cancel with ${sub.name} directly.`;
+  openPopup("popup-stop-sub");
+}
+
+document.getElementById("stop-sub-keep-btn").addEventListener("click", function() {
+  pendingStopSubId = null;
+  closePopup("popup-stop-sub");
+});
+
+document.getElementById("stop-sub-confirm-btn").addEventListener("click", function() {
+  let sub = state.subscriptions.find(function(s) {
+    return s.id === pendingStopSubId;
+  });
+  sub.stopped = true;
+  pendingStopSubId = null;
+
+  // totals, the dashboard chart and the notification all depend on which subscriptions are active
+  renderSubscriptions(sub.id);
+  renderSpendingChart();
+  renderNotification();
+
+  closePopup("popup-stop-sub");
+  showToast("Subscription payments stopped");
+});
 
 // ========================== Step 8: History ==================================
 
@@ -625,6 +773,7 @@ document.getElementById("assign-save-btn").addEventListener("click", function() 
 
   selectedTransactionIds = [];
   renderHistoryList();
+  renderRecentTransactions(); // the dashboard shows categories too, keep it in sync
   updateHistoryButtons();
   closePopup("popup-assign");
   showToast("Category saved");
@@ -639,9 +788,20 @@ document.getElementById("export-btn").addEventListener("click", function() {
     return selectedTransactionIds.includes(tx.id);
   });
 
+  // Text values go in quotes so a comma inside a name doesn't split it into
+  // two columns; a quote inside a value is written twice ("") as CSV requires.
+  function csvValue(text) {
+    return `"${String(text).replace(/"/g, '""')}"`;
+  }
+
   let csvRows = ["Merchant,Date,Category,Amount"];
   for (let tx of selectedTransactions) {
-    csvRows.push(`${tx.merchant},${formatDate(tx.date)},${tx.category},${tx.amount}`);
+    csvRows.push([
+      csvValue(tx.merchant),
+      csvValue(formatFullDate(tx.date)), // full date with the year, for records/reimbursement
+      csvValue(tx.category),
+      tx.amount.toFixed(2),
+    ].join(","));
   }
   let csvContent = csvRows.join("\n");
 
@@ -664,4 +824,46 @@ document.getElementById("export-ok-btn").addEventListener("click", function() {
   selectedTransactionIds = [];
   renderHistoryList();
   updateHistoryButtons();
+});
+
+// ========================== Step 10: Text size setting ==================================
+
+// Large text adds class="large-text" to <body>; styles.css then scales every
+// rem-based size up. The choice is saved in localStorage so it stays on.
+// localStorage can be blocked (e.g. private browsing), hence the try/catch:
+// the setting still works, it just isn't remembered.
+const TEXT_SIZE_KEY = "clearbank-text-size";
+
+function applyTextSize(size) {
+  document.body.classList.toggle("large-text", size === "large");
+  for (let radio of document.querySelectorAll('input[name="text-size"]')) {
+    radio.checked = radio.value === size;
+  }
+}
+
+let savedTextSize = "standard";
+try {
+  savedTextSize = localStorage.getItem(TEXT_SIZE_KEY) || "standard";
+} catch (e) {
+  // storage unavailable: keep the default
+}
+applyTextSize(savedTextSize);
+
+for (let radio of document.querySelectorAll('input[name="text-size"]')) {
+  radio.addEventListener("change", function() {
+    applyTextSize(radio.value); // change straight away so the user sees the difference
+    try {
+      localStorage.setItem(TEXT_SIZE_KEY, radio.value);
+    } catch (e) {
+      // storage unavailable: the setting still applies for this visit
+    }
+  });
+}
+
+document.getElementById("text-size-btn").addEventListener("click", function() {
+  openPopup("popup-text-size");
+});
+
+document.getElementById("text-size-done-btn").addEventListener("click", function() {
+  closePopup("popup-text-size");
 });

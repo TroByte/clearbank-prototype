@@ -263,4 +263,35 @@ button, input, select { font: inherit; color: inherit; }
 .sub-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid #EEF1F2; }
 .sub-detail p { margin: 4px 0; color: var(--muted); font-size: 0.9375rem; }
 
-/* TODO: styles for your screens go below here */
+/* ----- Header "Aa" text-size button ----- */
+.text-size-btn { font-weight: 700; font-size: 1rem; }
+
+/* ----- Dashboard spending chart -----
+   Each row: label | track with a filled bar | amount.
+   The bar's width is set inline from JS as a % of the biggest category. */
+.bar-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  font-size: 0.9375rem;
+}
+.bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: #EEF1F2;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+/* ----- Read-back "Name confirmed" line ----- */
+.verified-text { color: var(--success); font-weight: 600; }
+
+/* ----- Stopped subscriptions: greyed out, moved to the bottom ----- */
+.sub-row-stopped { opacity: 0.55; }
+.stop-sub-btn { margin-top: 12px; }

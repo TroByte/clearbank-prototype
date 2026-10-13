@@ -18,6 +18,7 @@
     <header class="app-header">
       <h1 class="app-title">ClearBank</h1>
       <div class="header-actions">
+        <button class="icon-btn text-size-btn" id="text-size-btn" aria-label="Text size">Aa</button>
         <button class="icon-btn" id="bell-btn" aria-label="Notifications">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="bell-dot" id="bell-dot"></span>
@@ -68,8 +69,11 @@
             <label for="new-payee-account">Account number</label>
             <input type="text" id="new-payee-account" inputmode="numeric" placeholder="12-3456-7890123-00">
             <button class="btn" id="check-payee-btn" type="button">Check</button>
-            <div class="check-result" id="check-result" hidden></div>
           </div>
+
+          <!-- Outside the form on purpose: the form hides on a match, but the
+               green "Name matches" message must stay visible. -->
+          <div class="check-result" id="check-result" hidden></div>
 
           <div class="form-group">
             <label for="transfer-amount">Amount</label>
@@ -85,6 +89,7 @@
       <section class="screen" id="screen-confirm" hidden>
         <div class="card" id="confirm-readback">
           <p id="confirm-text"></p>
+          <p id="confirm-verified" class="verified-text" hidden></p>
           <p id="confirm-balance-after" class="muted"></p>
           <button class="btn btn-primary" id="confirm-pay-btn" type="button">Confirm and pay</button>
           <button class="btn" id="confirm-edit-btn" type="button">Edit</button>
@@ -135,12 +140,13 @@
          Only the notification and the two History popups are overlays — the
          scam warning lives inline on the Transfer screen instead. -->
 
-    <!-- 2. Notification popup -->
+    <!-- 2. Notification popup. The title and body are filled in by
+         renderNotification() from any subscription whose price changed. -->
     <div class="overlay" id="popup-notification" hidden>
       <div class="popup" role="dialog" aria-modal="true">
-        <h2>Spotify price increase</h2>
-        <p>Your Spotify subscription went up from $16.99 to $18.99 a month.</p>
-        <p class="muted">You're seeing this because a recurring price changed.</p>
+        <h2 id="notification-title"></h2>
+        <div id="notification-body"></div>
+        <p class="muted" id="notification-reason">You're seeing this because a recurring price changed.</p>
         <button class="btn btn-primary" id="notification-ok-btn">OK</button>
         <button class="btn" id="notification-view-sub-btn">View subscription</button>
       </div>
@@ -170,6 +176,33 @@
         <p>Export completed</p>
         <p id="export-text"></p>
         <button class="btn btn-primary" id="export-ok-btn" type="button">OK</button>
+      </div>
+    </div>
+
+    <!-- Stop subscription (Subscriptions popup) -->
+    <div class="overlay" id="popup-stop-sub" hidden>
+      <div class="popup" role="dialog" aria-modal="true">
+        <h2>Stop this subscription?</h2>
+        <p id="stop-sub-text"></p>
+        <button class="btn" id="stop-sub-keep-btn" type="button">Keep it</button>
+        <button class="btn btn-primary" id="stop-sub-confirm-btn" type="button">Yes, stop payments</button>
+      </div>
+    </div>
+
+    <!-- Text size (opened from the "Aa" button in the header) -->
+    <div class="overlay" id="popup-text-size" hidden>
+      <div class="popup" role="dialog" aria-modal="true">
+        <h2>Text size</h2>
+        <label class="checkbox-label">
+          <input type="radio" name="text-size" value="standard" checked>
+          Standard
+        </label>
+        <label class="checkbox-label">
+          <input type="radio" name="text-size" value="large">
+          Large
+        </label>
+        <p class="muted">ClearBank remembers this on this device.</p>
+        <button class="btn btn-primary" id="text-size-done-btn" type="button">Done</button>
       </div>
     </div>
 

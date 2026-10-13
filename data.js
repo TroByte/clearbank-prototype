@@ -25,7 +25,7 @@ function daysFromNow(n) {
 
 // Fake Confirmation-of-Payee register: who each account number REALLY belongs to.
 // The "Check" button on Add new payee looks the account up here.
-// Any account number not listed here gives the amber "Couldn't confirm" result.
+// Any account number not listed here gives the amber warning ("registered to someone else").
 const PAYEE_REGISTER = {
   "12-3456-7890123-00": "S Tipene",   // main scenario: name matches
   "12-9999-0000000-00": "K Morrison", // mismatch demo: triggers the scam warning
@@ -51,10 +51,11 @@ function createStartData() {
       { category: "Shopping",  amount: 160.00 },
     ],
 
-    // Saved payees.
+    // Saved payees. verified = their name was already checked against the account,
+    // so the read-back shows "Name confirmed".
     payees: [
-      { id: "mum",      nickname: "Mum",      name: "A Olsen",           account: "12-3100-0456789-00" },
-      { id: "landlord", nickname: "Landlord", name: "Harcourts Rentals", account: "02-0500-0987654-00" },
+      { id: "mum",      nickname: "Mum",      name: "A Olsen",           account: "12-3100-0456789-00", verified: true },
+      { id: "landlord", nickname: "Landlord", name: "Harcourts Rentals", account: "02-0500-0987654-00", verified: true },
     ],
 
     // Transactions. amount is money OUT of the Everyday account (positive number).
@@ -76,6 +77,8 @@ function createStartData() {
     ],
 
     // Subscriptions. Only Spotify has previousPrice / priceChangedOn (it's the price-up example).
+    // Any subscription given a previousPrice gets the notification and "Price up" tag automatically.
+    // "Stop this subscription" adds stopped: true, which removes it from the totals.
     subscriptions: [
       { id: "spotify", name: "Spotify",  price: 18.99, previousPrice: 16.99, priceChangedOn: daysAgo(7), nextCharge: daysFromNow(23) },
       { id: "netflix", name: "Netflix",  price: 20.99, nextCharge: daysFromNow(16) },
